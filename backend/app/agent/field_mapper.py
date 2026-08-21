@@ -12,6 +12,8 @@ FIELD_ALIASES = {
         "item name",
         "product description",
         "item description",
+        "what item are you looking for?",
+        "what item are you looking for",
     },
 
     "quantity": {
@@ -22,6 +24,8 @@ FIELD_ALIASES = {
         "number of products",
         "number of units",
         "units",
+        "how many pieces are required?",
+        "how many pieces are required",
     },
 
     "delivery_location": {
@@ -31,15 +35,21 @@ FIELD_ALIASES = {
         "destination",
         "delivery address",
         "ship to",
+        "where should we ship the order?",
+        "where should we ship the order",
     },
 
     "delivery": {
         "delivery",
         "delivery time",
         "delivery period",
+        "delivery days",
+        "required delivery",
+        "required delivery days",
         "lead time",
         "expected delivery",
         "expected arrival",
+        "expected arrival timeframe",
         "shipping time",
     },
 
@@ -47,6 +57,8 @@ FIELD_ALIASES = {
         "warranty",
         "warranty period",
         "warranty coverage",
+        "coverage duration",
+        "coverage period",
         "guarantee",
         "guarantee period",
     },
@@ -61,17 +73,21 @@ SUPPORTED_CONCEPTS = [
     "warranty",
 ]
 
+
 AUTO_ACCEPT_THRESHOLD = 0.85
 REVIEW_THRESHOLD = 0.65
+
 
 def normalize_field_name(field_name: str) -> str:
     """
     Normalize a website field name so that
-    small differences in capitalization and spacing
-    don't affect matching.
+    differences in capitalization and whitespace
+    do not affect matching.
     """
 
-    return " ".join(field_name.lower().strip().split())
+    return " ".join(
+        str(field_name).lower().strip().split()
+    )
 
 
 def match_known_alias(field_name: str) -> Optional[str]:
@@ -85,14 +101,22 @@ def match_known_alias(field_name: str) -> Optional[str]:
 
     for concept, aliases in FIELD_ALIASES.items():
 
-        if normalized in aliases:
+        normalized_aliases = {
+            normalize_field_name(alias)
+            for alias in aliases
+        }
+
+        if normalized in normalized_aliases:
             return concept
 
     return None
 
 
-
 def map_unknown_field(field_name: str) -> FieldMappingResult:
+    """
+    Use Gemini only when deterministic matching
+    cannot identify the field.
+    """
 
     concepts = ", ".join(SUPPORTED_CONCEPTS)
 
@@ -127,13 +151,18 @@ Rules:
         },
     )
 
-    result = FieldMappingResult.model_validate_json(response.text)
-
-    return result
-
+    return FieldMappingResult.model_validate_json(
+        response.text
+    )
 
 
 def map_field(field_name: str) -> FieldMappingResult:
+    """
+    Map a supplier field to a procurement concept.
+
+    Known fields are handled locally without an API call.
+    Gemini is used only for genuinely unknown fields.
+    """
 
     known_concept = match_known_alias(field_name)
 
@@ -146,11 +175,13 @@ def map_field(field_name: str) -> FieldMappingResult:
             reasoning="Matched using a known field alias.",
         )
 
-    result = map_unknown_field(field_name)
+    return map_unknown_field(field_name)
 
-    return result
 
 def classify_confidence(confidence: float) -> str:
+    """
+    Classify a mapping according to its confidence score.
+    """
 
     if confidence >= AUTO_ACCEPT_THRESHOLD:
         return "auto_accept"

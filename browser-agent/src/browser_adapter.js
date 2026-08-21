@@ -13,6 +13,29 @@ function extractDomain(url) {
   }
 }
 
+function parseWebcmdResult(result) {
+  if (!result || typeof result.stdout !== "string") {
+    return result;
+  }
+
+  const lines = result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  // Webcmd may print logging before the JSON response.
+  // Use the last valid JSON object printed by the script.
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      return JSON.parse(lines[i]);
+    } catch {
+      // Ignore non-JSON logging.
+    }
+  }
+
+  return result;
+}
+
 export class BrowserAdapter {
   constructor(sessionId) {
     this.sessionId = sessionId;
@@ -25,7 +48,7 @@ export class BrowserAdapter {
   }
 
   async run(script) {
-    return await runWebcmd(
+    const result = await runWebcmd(
       [
         "--session",
         this.sessionId,
@@ -37,6 +60,8 @@ export class BrowserAdapter {
       ],
       script
     );
+
+    return parseWebcmdResult(result);
   }
 
   async goto(url) {
@@ -58,18 +83,47 @@ console.log(JSON.stringify({
   async inspect() {
     const script = `
 const currentUrl = page.url();
-const bodyText = await page.locator("body").innerText();
 
 const domain = String(currentUrl)
   .replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\\/\\//, "")
   .split("/")[0]
   .split(":")[0];
 
+const fields = await page.locator(
+  "input, textarea, select"
+).evaluateAll(
+  elements =>
+    elements.map((element) => ({
+      tag: element.tagName.toLowerCase(),
+      id: element.id || "",
+      name: element.getAttribute("name") || "",
+      type: element.getAttribute("type") || "",
+      placeholder:
+        element.getAttribute("placeholder") || "",
+      ariaLabel:
+        element.getAttribute("aria-label") || ""
+    }))
+);
+
+const buttons = await page.locator("button").evaluateAll(
+  elements =>
+    elements.map((element) => ({
+      text: (element.innerText || "").trim(),
+      id: element.id || "",
+      name: element.getAttribute("name") || "",
+      type: element.getAttribute("type") || ""
+    }))
+);
+
+const bodyText = await page.locator("body").innerText();
+
 console.log(JSON.stringify({
   success: true,
   action: "inspect",
   url: currentUrl,
   domain,
+  fields,
+  buttons,
   text: bodyText
 }));
 `;
@@ -80,7 +134,9 @@ console.log(JSON.stringify({
   async fill(selector, value) {
     const script = `
 try {
-  await page.locator(${JSON.stringify(selector)}).fill(
+  await page.locator(
+    ${JSON.stringify(selector)}
+  ).fill(
     ${JSON.stringify(String(value))}
   );
 
@@ -110,7 +166,9 @@ try {
   async click(selector) {
     const script = `
 try {
-  await page.locator(${JSON.stringify(selector)}).click();
+  await page.locator(
+    ${JSON.stringify(selector)}
+  ).click();
 
   console.log(JSON.stringify({
     success: true,
@@ -145,6 +203,7 @@ const domain = String(currentUrl)
 
 console.log(JSON.stringify({
   success: true,
+  action: "page_info",
   url: currentUrl,
   domain,
   title: await page.title()

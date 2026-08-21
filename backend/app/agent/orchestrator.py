@@ -4,13 +4,14 @@ from .recovery import recover_and_update_workflow
 from .requirement_parser import parse_requirement
 from .schemas import AgentResult
 from .workflow_memory import get_workflow, save_workflow
+from .browser_adapter_impl import BrowserAdapterImpl
 
 
 class AgentOrchestrator:
 
-    def __init__(self, browser):
+    def __init__(self, browser=None):
 
-        self.browser = browser
+        self.browser = browser or BrowserAdapterImpl()
 
         self.state = AgentState.IDLE
 
