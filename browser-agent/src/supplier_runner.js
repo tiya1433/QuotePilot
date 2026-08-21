@@ -1,14 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { BrowserAdapter } from "./browser_adapter.js";
+import { fileURLToPath } from "node:url";
 
 export async function loadSupplier(supplierId) {
-  const filePath = path.join(
-    process.cwd(),
-    "browser-agent",
-    "suppliers",
-    supplierId,
-    "supplier.json"
+  const filePath = fileURLToPath(
+    new URL(
+      `../suppliers/${supplierId}/supplier.json`,
+      import.meta.url
+    )
   );
 
   const data = await fs.readFile(filePath, "utf8");

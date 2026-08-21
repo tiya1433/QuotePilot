@@ -94,6 +94,7 @@ button {
 
   background: rgba(8, 16, 31, 0.82);
 
+  -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
 
   position: sticky;

@@ -1,5 +1,6 @@
 import { runWebcmd } from "./webcmd_runner.js";
 
+
 function extractDomain(url) {
   try {
     const withoutProtocol = String(url).replace(
@@ -93,16 +94,64 @@ const fields = await page.locator(
   "input, textarea, select"
 ).evaluateAll(
   elements =>
-    elements.map((element) => ({
-      tag: element.tagName.toLowerCase(),
-      id: element.id || "",
-      name: element.getAttribute("name") || "",
-      type: element.getAttribute("type") || "",
-      placeholder:
-        element.getAttribute("placeholder") || "",
-      ariaLabel:
-        element.getAttribute("aria-label") || ""
-    }))
+    elements.map((element) => {
+      const id = element.id || "";
+      const name = element.getAttribute("name") || "";
+
+      let label = "";
+
+      if (id) {
+        const labelElement = document.querySelector(
+          'label[for="' + CSS.escape(id) + '"]'
+        );
+
+        if (labelElement) {
+          label = labelElement.innerText.trim();
+        }
+      }
+
+      if (!label) {
+        const parentLabel = element.closest("label");
+
+        if (parentLabel) {
+          label = parentLabel.innerText.trim();
+        }
+      }
+
+      if (!label) {
+        label =
+          element.getAttribute("aria-label") ||
+          element.getAttribute("placeholder") ||
+          name ||
+          id ||
+          "";
+      }
+
+      let selector = "";
+
+      if (id) {
+        selector = "#" + CSS.escape(id);
+      } else if (name) {
+        selector =
+          element.tagName.toLowerCase() +
+          '[name="' +
+          CSS.escape(name) +
+          '"]';
+      }
+
+      return {
+        label,
+        selector,
+        tag: element.tagName.toLowerCase(),
+        id,
+        name,
+        type: element.getAttribute("type") || "",
+        placeholder:
+          element.getAttribute("placeholder") || "",
+        ariaLabel:
+          element.getAttribute("aria-label") || ""
+      };
+    })
 );
 
 const buttons = await page.locator("button").evaluateAll(
@@ -212,4 +261,22 @@ console.log(JSON.stringify({
 
     return this.run(script);
   }
+
+    async getQuote(supplierName = null) {
+    const script = `
+const currentUrl = page.url();
+const response = await page.locator("body").innerText();
+
+console.log(JSON.stringify({
+  success: true,
+  action: "get_quote",
+  supplier: ${JSON.stringify(supplierName)},
+  url: currentUrl,
+  response
+}));
+`;
+
+    return this.run(script);
+  }
+
 }

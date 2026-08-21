@@ -1,73 +1,85 @@
 from app.agent.orchestrator import AgentOrchestrator
-
-
-class FakeBrowser:
-
-    def __init__(self):
-
-        self.fields = [
-            "Product Description",
-            "How many pieces are required?",
-            "Destination",
-            "Expected Arrival",
-            "Coverage Duration",
-        ]
-
-        self.values = {}
-
-    def inspect_fields(self):
-
-        print("\n🌐 Browser: Inspecting fields...")
-
-        return self.fields
-
-    def fill_field(self, field_name, value):
-
-        print(
-            f"🌐 Browser: Filling '{field_name}' "
-            f"with '{value}'"
-        )
-
-        if field_name not in self.fields:
-
-            print(
-                f"❌ Browser: Field '{field_name}' not found."
-            )
-
-            return False
-
-        self.values[field_name] = value
-
-        print("✓ Browser: Field filled.")
-
-        return True
-
-    def submit_quote_request(self):
-
-        print("\n🌐 Browser: Quote request submitted.")
-
-        return True
+from app.agent.browser_adapter_impl import BrowserAdapterImpl
 
 
 def main():
 
-    browser = FakeBrowser()
+    supplier_id = "supplier-c"
 
-    agent = AgentOrchestrator(browser)
-
-    result = agent.run(
-        user_request=(
-            "I need 100 Dell laptops delivered to Kolkata "
-            "within 7 days with at least 2 years warranty."
-        ),
-        supplier_id="supplier_orchestrator_demo",
+    user_request = (
+        "I need 100 Dell laptops delivered to Kolkata "
+        "within 7 days with at least 2 years warranty."
     )
 
-    print("\n" + "=" * 70)
-    print("FINAL AGENT RESULT")
-    print("=" * 70)
+    browser = BrowserAdapterImpl()
 
-    print(result.model_dump_json(indent=2))
+    try:
+
+        # --------------------------------------------------
+        # STEP 1 — Open the REAL supplier website through Webcmd
+        # --------------------------------------------------
+
+        print("\n🌐 Opening Supplier...")
+
+        open_result = browser.browser.open_supplier(
+            supplier_id
+        )
+
+        print("OPEN RESULT:")
+        print(open_result)
+
+        if not open_result.get("success"):
+            print("❌ Supplier could not be opened.")
+            return
+
+        # Get the human-readable supplier name
+        # returned from supplier.json.
+        supplier_name = open_result.get("supplier")
+
+        if not supplier_name:
+            print("❌ Supplier name was not returned.")
+            return
+
+        print(
+            f"✅ Supplier opened: {supplier_name}"
+        )
+
+        # --------------------------------------------------
+        # STEP 2 — Create the REAL intelligence orchestrator
+        # --------------------------------------------------
+
+        agent = AgentOrchestrator(
+            browser=browser,
+            supplier_name=supplier_name,
+        )
+
+        # --------------------------------------------------
+        # STEP 3 — Run the complete procurement workflow
+        # --------------------------------------------------
+
+        result = agent.run(
+            user_request=user_request,
+            supplier_id=supplier_id,
+        )
+
+        # --------------------------------------------------
+        # STEP 4 — Display final result
+        # --------------------------------------------------
+
+        print("\n" + "=" * 70)
+        print("FINAL REAL-BROWSER AGENT RESULT")
+        print("=" * 70)
+
+        print(
+            result.model_dump_json(
+                indent=2
+            )
+        )
+
+    finally:
+
+        # Always close the browser bridge.
+        browser.close()
 
 
 if __name__ == "__main__":
