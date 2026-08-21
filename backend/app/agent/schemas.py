@@ -2,6 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+
 class ProcurementRequirements(BaseModel):
     product: str = Field(
         description="The product or item the user wants to procure."
@@ -35,21 +36,32 @@ class ProcurementRequirements(BaseModel):
 
     @field_validator("max_delivery_days")
     @classmethod
-    def validate_delivery_days(cls, value: int | None) -> int | None:
+    def validate_delivery_days(
+        cls,
+        value: int | None,
+    ) -> int | None:
         if value is not None and value <= 0:
-            raise ValueError("Delivery days must be greater than 0.")
+            raise ValueError(
+                "Delivery days must be greater than 0."
+            )
         return value
 
     @field_validator("min_warranty_years")
     @classmethod
-    def validate_warranty(cls, value: float | None) -> float | None:
+    def validate_warranty(
+        cls,
+        value: float | None,
+    ) -> float | None:
         if value is not None and value < 0:
-            raise ValueError("Warranty cannot be negative.")
+            raise ValueError(
+                "Warranty cannot be negative."
+            )
         return value
 
 
 class FieldMappingResult(BaseModel):
     field_name: str
+
     concept: Literal[
         "product",
         "quantity",
@@ -61,7 +73,10 @@ class FieldMappingResult(BaseModel):
     confidence: float = Field(
         ge=0.0,
         le=1.0,
-        description="Confidence that the field maps to the selected concept."
+        description=(
+            "Confidence that the field maps "
+            "to the selected concept."
+        ),
     )
 
     reasoning: str
@@ -72,11 +87,24 @@ class FieldMappingResult(BaseModel):
         return value.strip()
 
 
+class QuoteResult(BaseModel):
+    supplier: str | None = None
+    product: str | None = None
+    quantity: int = 0
+    price: float = 0
+    delivery_days: int = 0
+    warranty_years: float = 0
+    quote_id: str | None = None
+
 
 class AgentResult(BaseModel):
     success: bool
     state: str
     supplier_id: str
     message: str
+
     requirements: ProcurementRequirements | None = None
+
     mappings: dict[str, str] | None = None
+
+    quote: QuoteResult | None = None

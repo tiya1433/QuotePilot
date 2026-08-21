@@ -44,6 +44,7 @@ FIELD_ALIASES = {
         "delivery time",
         "delivery period",
         "delivery days",
+        "delivery_days",
         "required delivery",
         "required delivery days",
         "lead time",
@@ -81,13 +82,18 @@ REVIEW_THRESHOLD = 0.65
 def normalize_field_name(field_name: str) -> str:
     """
     Normalize a website field name so that
-    differences in capitalization and whitespace
-    do not affect matching.
+    differences in capitalization, whitespace,
+    hyphens, and underscores do not affect matching.
     """
 
-    return " ".join(
-        str(field_name).lower().strip().split()
-    )
+    normalized = str(field_name).lower().strip()
+
+    # Treat underscores and hyphens like spaces.
+    normalized = normalized.replace("_", " ")
+    normalized = normalized.replace("-", " ")
+
+    # Normalize repeated whitespace.
+    return " ".join(normalized.split())
 
 
 def match_known_alias(field_name: str) -> Optional[str]:

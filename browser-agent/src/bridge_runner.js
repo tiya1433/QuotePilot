@@ -96,6 +96,21 @@ async function handle(command) {
         break;
       }
 
+            case "get_quote": {
+        const result = await browser.getQuote(
+          command.supplier_name
+        );
+
+        send({
+          success: true,
+          action: "get_quote",
+          result,
+        });
+
+        break;
+      }
+
+
       default:
         send({
           success: false,

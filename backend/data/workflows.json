@@ -18,5 +18,35 @@
       "delivery": "Expected Arrival",
       "warranty": "Coverage Duration"
     }
+  },
+  "supplier-a": {
+    "version": 1,
+    "mappings": {
+      "product": "#product",
+      "quantity": "#quantity",
+      "delivery_location": "#delivery_location",
+      "delivery": "#delivery_days",
+      "warranty": "#warranty"
+    }
+  },
+  "supplier-b": {
+    "version": 1,
+    "mappings": {
+      "product": "#product",
+      "quantity": "#quantity",
+      "delivery_location": "#delivery_location",
+      "delivery": "#delivery_days",
+      "warranty": "#warranty"
+    }
+  },
+  "supplier-c": {
+    "version": 1,
+    "mappings": {
+      "product": "#product",
+      "quantity": "#quantity",
+      "delivery_location": "#delivery_location",
+      "delivery": "#delivery_days",
+      "warranty": "#warranty"
+    }
   }
 }

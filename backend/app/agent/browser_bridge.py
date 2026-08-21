@@ -9,6 +9,9 @@ class BrowserBridge:
     def __init__(self):
         self.root = Path(__file__).resolve().parents[3]
 
+        print("BrowserBridge root:", self.root)
+        
+
         self.node_command = [
             "node",
             str(
@@ -18,6 +21,7 @@ class BrowserBridge:
                 / "bridge_runner.js"
             ),
         ]
+        print("Node command:", self.node_command)
 
         env = os.environ.copy()
 
@@ -132,6 +136,31 @@ class BrowserBridge:
                 "action": "page_info",
             }
         )
+
+
+    def get_quote(self, supplier_name: str | None = None) -> dict:
+        result = self._request(
+            {
+                "action": "get_quote",
+                "supplier_name": supplier_name,
+            }
+        )
+
+        if isinstance(result, dict):
+            data = result.get("result")
+
+            if isinstance(data, str):
+                try:
+                    decoded = json.loads(data)
+
+                    if isinstance(decoded, dict):
+                        result["result"] = decoded
+
+                except json.JSONDecodeError:
+                    pass
+
+        return result
+
 
     def close(self):
         if self.process.poll() is None:

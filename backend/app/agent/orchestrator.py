@@ -5,20 +5,22 @@ from .requirement_parser import parse_requirement
 from .schemas import AgentResult
 from .workflow_memory import get_workflow, save_workflow
 from .browser_adapter_impl import BrowserAdapterImpl
+from .quote_normalizer import normalize_quote
 
 
 class AgentOrchestrator:
 
-    def __init__(self, browser=None):
-
+    def __init__(
+        self,
+        browser=None,
+        supplier_name=None,
+    ):
         self.browser = browser or BrowserAdapterImpl()
-
+        self.supplier_name = supplier_name
         self.state = AgentState.IDLE
 
     def set_state(self, state: AgentState):
-
         self.state = state
-
         print(f"\n🤖 Agent State → {state.value}")
 
     def run(
@@ -49,6 +51,9 @@ class AgentOrchestrator:
 
         current_fields = self.browser.inspect_fields()
 
+        print("\n🔎 CURRENT SUPPLIER FIELDS:")
+        print(current_fields)
+
         # --------------------------------------------------
         # STEP 4 — Learn if no workflow exists
         # --------------------------------------------------
@@ -61,11 +66,13 @@ class AgentOrchestrator:
 
             for field in current_fields:
 
-                result = map_field(field)
+                result = map_field(field["label"])
 
-                if result.concept and result.confidence >= 0.85:
-
-                    mappings[result.concept] = field
+                if (
+                    result.concept
+                    and result.confidence >= 0.85
+                ):
+                    mappings[result.concept] = field["selector"]
 
             if not mappings:
 
@@ -91,7 +98,6 @@ class AgentOrchestrator:
         # --------------------------------------------------
 
         else:
-
             self.set_state(AgentState.REUSING)
 
         mappings = workflow["mappings"]
@@ -102,13 +108,21 @@ class AgentOrchestrator:
 
         requirement_values = {
             "product": requirements.product,
-            "quantity": str(requirements.quantity),
-            "delivery_location": requirements.delivery_location,
+
+            "quantity": str(
+                requirements.quantity
+            ),
+
+            "delivery_location": (
+                requirements.delivery_location
+            ),
+
             "delivery": (
                 str(requirements.max_delivery_days)
                 if requirements.max_delivery_days is not None
                 else None
             ),
+
             "warranty": (
                 str(requirements.min_warranty_years)
                 if requirements.min_warranty_years is not None
@@ -155,7 +169,8 @@ class AgentOrchestrator:
                         state=self.state.value,
                         supplier_id=supplier_id,
                         message=(
-                            f"Could not recover field for '{concept}'."
+                            f"Could not recover field "
+                            f"for '{concept}'."
                         ),
                         requirements=requirements,
                         mappings=mappings,
@@ -179,15 +194,73 @@ class AgentOrchestrator:
                         state=self.state.value,
                         supplier_id=supplier_id,
                         message=(
-                            f"Recovered field '{field_name}' "
-                            "but browser could not fill it."
+                            f"Recovered field "
+                            f"'{field_name}' but browser "
+                            "could not fill it."
                         ),
                         requirements=requirements,
                         mappings=mappings,
                     )
 
         # --------------------------------------------------
-        # STEP 8 — Complete
+        # STEP 8 — Submit quote request
+        # --------------------------------------------------
+
+        submit_success = (
+            self.browser.submit_quote_request()
+        )
+
+        if not submit_success:
+
+            self.set_state(AgentState.FAILED)
+
+            return AgentResult(
+                success=False,
+                state=self.state.value,
+                supplier_id=supplier_id,
+                message="Could not submit quote request.",
+                requirements=requirements,
+                mappings=mappings,
+            )
+
+        # --------------------------------------------------
+        # STEP 9 — Retrieve quote
+        # --------------------------------------------------
+
+        try:
+
+            print(
+                "\n🌐 Browser: Retrieving generated quote..."
+            )
+
+            # Use the actual supplier name instead of
+            # the internal supplier ID.
+            raw_quote = self.browser.get_quote(
+                self.supplier_name
+            )
+
+            quote = normalize_quote(raw_quote)
+
+            print("✓ Quote retrieved successfully.")
+
+        except Exception as error:
+
+            self.set_state(AgentState.FAILED)
+
+            return AgentResult(
+                success=False,
+                state=self.state.value,
+                supplier_id=supplier_id,
+                message=(
+                    f"Could not retrieve or parse quote: "
+                    f"{error}"
+                ),
+                requirements=requirements,
+                mappings=mappings,
+            )
+
+        # --------------------------------------------------
+        # STEP 10 — Complete
         # --------------------------------------------------
 
         self.set_state(AgentState.COMPLETED)
@@ -196,7 +269,10 @@ class AgentOrchestrator:
             success=True,
             state=self.state.value,
             supplier_id=supplier_id,
-            message="Supplier quote workflow completed successfully.",
+            message=(
+                "Supplier quote workflow completed successfully."
+            ),
             requirements=requirements,
             mappings=mappings,
+            quote=quote,
         )
